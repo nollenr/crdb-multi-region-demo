@@ -1,0 +1,23 @@
+pip3 install sqlalchemy~=1.4
+pip3 install sqlalchemy-cockroachdb
+# install sqlalchemy/psycopg2
+
+pip3 install aws-psycopg2
+pip3 install flake8
+
+Change the key file permssions! 
+        change owner to ec2-user
+        change mod to 600
+
+The sql/import.sql file needs to be edited to include the regions of the demo:
+        ALTER DATABASE movr_demo SET PRIMARY REGION = "us-east-2";  -- OH
+        ALTER DATABASE movr_demo ADD REGION "us-west-2";  -- OR
+        ALTER DATABASE movr_demo ADD REGION "us-east-1";  -- VA1
+
+# Set up the demo data and run it on just one node
+cockroach-sql sql --url "postgres://bob@192.168.3.113:26257/defaultdb?sslmode=verify-full&sslrootcert=$HOME/certs/ca.crt&sslcert=$HOME/certs/client.bob.crt&sslkey=$HOME/certs/client.bob.key" --file sql/import.sql
+
+
+THE CONNECTION IN demo.py is "postgresql" not "postgres"
+    
+

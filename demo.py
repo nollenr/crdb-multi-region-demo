@@ -133,15 +133,22 @@ def main():
     stats = DemoStats(STATS_INTERVAL_SECS)
     op_timer = DemoTimer()
 
+    HOST        = os.getenv('DB_HOST', 'cockroachdb://root@127.0.0.1:26257/movr_demo?application_name=movr_demo')
+    USER        = os.getenv('DB_USER', 'bob')
+    SSLCERT     = os.getenv('DB_SSLCERT', '/home/ec2-user/certs/client.bob.crt')
+    SSLKEY      = os.getenv('DB_SSLKEY', '/home/ec2-user/certs/client.bob.key')
+    SSLROOTCERT = os.getenv('DB_SSLROOTCERT', '/home/ec2-user/certs/ca.crt')
+    SSLMODE     = os.getenv('DB_SSLMODE', 'require')
+
     args = {
-        "host":        "192.168.3.113",
+        "host":        HOST,
         "port":        "26257",
-        "user":        "bob",
+        "user":        USER,
         "dbname":      "movr_demo",
-        "sslcert":     "/home/ec2-user/certs/client.bob.crt",
-        "sslkey":      "/home/ec2-user/certs/client.bob.key",
-        "sslrootcert": "/home/ec2-user/certs/ca.crt",
-        "sslmode":     "require",
+        "sslcert":     SSLCERT,
+        "sslkey":      SSLKEY,
+        "sslrootcert": SSLROOTCERT,
+        "sslmode":     SSLMODE,
         "application_name" : "movr_demo",
     }
     db_engine = create_engine("cockroachdb://", connect_args=args)

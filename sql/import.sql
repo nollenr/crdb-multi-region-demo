@@ -1,3 +1,7 @@
+SET CLUSTER SETTING kv.snapshot_rebalance.max_rate = '4g'; 
+SET CLUSTER SETTING kv.snapshot_recovery.max_rate = '4g';
+SET CLUSTER SETTING server.time_until_store_dead = '1m15s';
+
 CREATE TABLE movr_demo.public.vehicle_location_histories (
     id UUID NOT NULL PRIMARY KEY DEFAULT gen_random_uuid(),
     ride_id UUID NOT NULL,

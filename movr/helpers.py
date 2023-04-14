@@ -154,7 +154,7 @@ def run_transaction(db_engine: SAEngine, txn_func, max_retries=10):
 
         # except DatabaseError as e:
         except DatabaseError as e:
-            print(e)
+            # print(e)
             if max_retries is not None and retry_count >= max_retries:
                 raise
             retry_count += 1

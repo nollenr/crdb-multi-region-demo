@@ -8,6 +8,14 @@ from sqlalchemy.sql import text
 
 
 # ----
+# Node Info
+# ----
+def get_node_info(conn: Connection) -> str:
+    sql = text("select node_id, locality from crdb_internal.gossip_nodes where node_id = crdb_internal.node_id()")
+    result = conn.execute(sql).one()
+    return result
+
+# ----
 # User
 # ----
 def get_user(conn: Connection, user_id: UUID) -> UUID:

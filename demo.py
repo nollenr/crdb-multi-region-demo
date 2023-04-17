@@ -16,7 +16,7 @@ from sqlalchemy.engine import Engine as SAEngine
 # from movr.movr import MovR
 # from movr.models import User, Vehicle  # , Ride
 from movr.transactions2 import (
-    get_user, get_vehicle, get_users, get_vehicles,
+    get_node_info, get_user, get_vehicle, get_users, get_vehicles,
     start_ride, end_ride, read_ride_info,
     add_vehicle_location_history, read_vehicle_last_location, update_vehicle_status,
     read_ride_info_aost
@@ -127,12 +127,16 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
     )
     stats.add_to_stats(DemoStats.OP_READ_RIDE_AOST, op_timer.stop())
 
+    # Get the node info all of this was run on
+    node_info = run_transaction(
+        db_engine,
+        lambda conn: get_node_info(conn)
+    )
+    stats.update_node_info(node_info[0], node_info[1])
+    
+
 
 def main():
-    # movr = MovR(Config.DB_URI)
-    stats = DemoStats(STATS_INTERVAL_SECS)
-    op_timer = DemoTimer()
-
     HOST        = os.getenv('DB_HOST', 'cockroachdb://root@127.0.0.1:26257/movr_demo?application_name=movr_demo')
     USER        = os.getenv('DB_USER', 'bob')
     SSLCERT     = os.getenv('DB_SSLCERT', '/home/ec2-user/certs/client.bob.crt')
@@ -152,6 +156,17 @@ def main():
         "application_name" : "movr_demo",
     }
     db_engine = create_engine("cockroachdb://", connect_args=args)
+
+    # Get node info to display at startup
+    node_info = run_transaction(
+        db_engine,
+        lambda conn: get_node_info(conn)
+    )
+
+    print(f"Connected to node id {node_info[0]} at {node_info[1]}")
+
+    stats = DemoStats(STATS_INTERVAL_SECS, node_info[0], node_info[1])
+    op_timer = DemoTimer()
 
     # Build a list of users and vehicles so we can randomly pull from them
     # user_ids = []

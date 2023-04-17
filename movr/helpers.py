@@ -38,8 +38,10 @@ class DemoStats():
     OP_READ_LAST_LOCATION = 'read_last_location'
     OP_UPDATE_VEHICLE_STATUS = 'update_vehicle_status'
 
-    def __init__(self, reporting_inteval_secs: int) -> None:
+    def __init__(self, reporting_inteval_secs: int, node_id: int, node_location: str) -> None:
 
+        self.node_id = node_id
+        self.node_location = node_location
         self.reporting_secs = reporting_inteval_secs
         self.lock = RLock()  # Make this thread safe
 
@@ -62,6 +64,10 @@ class DemoStats():
         for op_name in self.op_names:
             self.stats_objs[op_name] = OpStats(op_name)
 
+    def update_node_info(self, node_id: int, node_location: str) -> None:
+        self.node_id = node_id
+        self.node_location = node_location
+        
     def add_to_stats(self, op_name: str, time_ms: float) -> None:
         with self.lock:
             stat = self.stats_objs.get(op_name, time_ms)  # type: OpStats
@@ -104,7 +110,8 @@ class DemoStats():
             rbr_reads_ms = mean([self.stats_objs[DemoStats.OP_READ_LAST_LOCATION].last_ms_avg])
             rbr_writes_ms = mean([self.stats_objs[DemoStats.OP_INSERT_LOCATION].last_ms_avg])
 
-            print(statstime)
+            print(f"{statstime} node: {self.node_id}")
+            print(self.node_location)
             print('---------------------------------------')
             print('Global tables (users, vehicles)')
             print(f"  reads:  {global_reads_ms:>8.2f} ms avg")

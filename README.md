@@ -2,18 +2,10 @@
 
 This demo demonstrates the latencies expected from the three types of multi-region tables (Global, Regional, Regional-by-row) using a modified variant of the MovR app. It then demonstrates what happens to the application when a region fails.
 
-The scripts in this demo were created for use with `roachprod`. However they could be modified to be used with any deployment of CockroachDB. To be able to simulate region failure, the CockroachDB deployment would need to have the ability to manually bring down nodes and leave them down (i.e. not possible with CockroachCloud today).
-
 # Walkthrough of the demo
 ## Setup
 I recommend opening three terminals, and arrange them like so:
 
-![](/docs/mr-demo-1-latencies.png)
-
-The top-left terminal you will use for controlling the demo. The bottom two terminals are for running the `demo.py` application in two regions (OR and SC, respectively). The [regions.png](/docs/regions.jpg) graphic is in this repositories `/docs` folder.
-
-
-Assuming each terminal has it's current working directory at the root of this repository, run these commands to prepare the demo:
 
 **Top-left (controller terminal)**
 

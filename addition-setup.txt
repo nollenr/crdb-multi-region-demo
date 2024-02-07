@@ -1,0 +1,18 @@
+
+# As root
+dnf install python3.8 -y
+pip3.8 install sqlalchemy
+dnf install python38-devel -y
+pip3.8 install psycopg2
+pip3.8 install sqlalchemy-cockroachdb
+pip3.8 install prometheus-client
+
+
+Remember to open the Network Security Group for the General App Server (where Grafana will be running) on port 9090
+    Source: IP Address
+    Source IP Address Range: 52.233.87.48/32
+    Source Port Ranges: *
+    Destination: Any
+    Service: Custom
+    Destination Port Ranges: 9090
+    Name: Grafana

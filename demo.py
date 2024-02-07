@@ -8,6 +8,11 @@ import sys
 # import time
 from uuid import uuid4
 
+from prometheus_client import start_http_server, Summary, Histogram
+import random
+import time
+from time import perf_counter
+
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine as SAEngine
 # from sqlalchemy.orm import scoped_session, sessionmaker
@@ -27,6 +32,15 @@ STATS_INTERVAL_SECS = 5
 NUM_UPDATES_PER_RIDE = 5
 
 DB_URI = os.getenv('DB_URI', 'cockroachdb://root@127.0.0.1:26257/movr_demo?application_name=movr_demo')
+READ_USER_HISTOGRAM = Histogram('read_user_latency','DB Time to read a user')
+READ_VEHICLE_HISTOGRAM = Histogram('read_vehicle_latency','DB Time to read a vehicle')
+UPDATE_VECHICLE_STATUS_HISTOGRAM = Histogram('update_vehicle_status_latency','DB Time to update a vehicle status')
+ADD_A_RIDE_HISTOGRAM = Histogram('add_a_ride_latency','DB Time to add a ride')
+UPDATE_VEHICLE_LOCATION_HISTOGRAM = Histogram('update_vehicle_location_latency','DB Time to update a vehicle location')
+READ_VEHICLE_LOCATION_HISTOGRAM = Histogram('read_vehicle_location_latency','DB Time to read a vehicle location')
+END_A_RIDE_HISTOGRAM = Histogram('end_a_ride_latency','DB Time to end a ride')
+READ_A_RIDE_SUMMARY_HISTOGRAM = Histogram('read_a_ride_summary_latency','DB Time to read a ride summary')
+READ_A_RIDE_SUMMARY_AOST_HISTOGRAM = Histogram('read_a_ride_summary_aost_latency','DB Time to read a ride summary using AOST.')
 
 
 def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_timer: DemoTimer, stats: DemoStats):
@@ -38,38 +52,46 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
 
     # Read the user
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: get_user(conn, user_id)
     )
+    READ_USER_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_USER, op_timer.stop())
 
     # Read the vehicle
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: get_vehicle(conn, vehicle_id)
     )
+    READ_VEHICLE_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_VEHICLE, op_timer.stop())
 
     # Update the vehicle as 'in_use'
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: update_vehicle_status(conn, vehicle_id, 'in_use')
     )
+    UPDATE_VECHICLE_STATUS_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_UPDATE_VEHICLE_STATUS, op_timer.stop())
 
     # Add a ride
     ride_id = uuid4()
     start_time = dt.now()
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: start_ride(
             conn, ride_id, user_id, start_time, vehicle_id, 'San Francisco'
         )
     )
+    ADD_A_RIDE_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_INSERT_RIDE, op_timer.stop())
 
     # Update vechicle location history
@@ -80,51 +102,63 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
 
         # Record the current location
         op_timer.start()
+        start_txn_time = perf_counter()
         loc_id = run_transaction(
             db_engine,
             lambda conn: add_vehicle_location_history(conn, ride_id, seen_time, lat, long)
         )
+        UPDATE_VEHICLE_LOCATION_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
         stats.add_to_stats(DemoStats.OP_INSERT_LOCATION, op_timer.stop())
 
         # Read the latest location
         op_timer.start()
+        start_txn_time = perf_counter()
         run_transaction(
             db_engine,
             lambda conn: read_vehicle_last_location(conn, loc_id)
         )
+        READ_VEHICLE_LOCATION_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
         stats.add_to_stats(DemoStats.OP_READ_LAST_LOCATION, op_timer.stop())
 
     # End a ride
     end_time = dt.now()
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: end_ride(conn, ride_id, end_time)
     )
+    END_A_RIDE_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_UPDATE_RIDE, op_timer.stop())
 
     # Update the vehicle as 'available'
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: update_vehicle_status(conn, vehicle_id, 'available')
     )
+    UPDATE_VECHICLE_STATUS_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_UPDATE_VEHICLE_STATUS, op_timer.stop())
 
     # Read ride summary
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: read_ride_info(conn, ride_id)
     )
+    READ_A_RIDE_SUMMARY_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_RIDE, op_timer.stop())
 
     # Read ride summary as a follower read
     op_timer.start()
+    start_txn_time = perf_counter()
     run_transaction(
         db_engine,
         lambda conn: read_ride_info_aost(conn, ride_id)
     )
+    READ_A_RIDE_SUMMARY_AOST_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_RIDE_AOST, op_timer.stop())
 
     # Get the node info all of this was run on
@@ -137,6 +171,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
 
 
 def main():
+    start_http_server(8000)
     HOST        = os.getenv('DB_HOST', 'cockroachdb://root@127.0.0.1:26257/movr_demo?application_name=movr_demo')
     USER        = os.getenv('DB_USER', 'bob')
     SSLCERT     = os.getenv('DB_SSLCERT', '/home/ec2-user/certs/client.bob.crt')

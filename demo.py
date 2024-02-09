@@ -7,6 +7,7 @@ import sys
 # from time import perf_counter
 # import time
 from uuid import uuid4
+import re
 
 from prometheus_client import start_http_server, Summary, Histogram
 import random
@@ -32,18 +33,19 @@ STATS_INTERVAL_SECS = 5
 NUM_UPDATES_PER_RIDE = 5
 
 DB_URI = os.getenv('DB_URI', 'cockroachdb://root@127.0.0.1:26257/movr_demo?application_name=movr_demo')
-READ_USER_HISTOGRAM = Histogram('read_user_latency','DB Time to read a user')
-READ_VEHICLE_HISTOGRAM = Histogram('read_vehicle_latency','DB Time to read a vehicle')
-UPDATE_VECHICLE_STATUS_HISTOGRAM = Histogram('update_vehicle_status_latency','DB Time to update a vehicle status')
-ADD_A_RIDE_HISTOGRAM = Histogram('add_a_ride_latency','DB Time to add a ride')
-UPDATE_VEHICLE_LOCATION_HISTOGRAM = Histogram('update_vehicle_location_latency','DB Time to update a vehicle location')
-READ_VEHICLE_LOCATION_HISTOGRAM = Histogram('read_vehicle_location_latency','DB Time to read a vehicle location')
-END_A_RIDE_HISTOGRAM = Histogram('end_a_ride_latency','DB Time to end a ride')
-READ_A_RIDE_SUMMARY_HISTOGRAM = Histogram('read_a_ride_summary_latency','DB Time to read a ride summary')
-READ_A_RIDE_SUMMARY_AOST_HISTOGRAM = Histogram('read_a_ride_summary_aost_latency','DB Time to read a ride summary using AOST.')
+
+READ_USER_HISTOGRAM = Histogram('read_user_latency','DB Time to read a user',['region'])
+READ_VEHICLE_HISTOGRAM = Histogram('read_vehicle_latency','DB Time to read a vehicle',['region'])
+UPDATE_VECHICLE_STATUS_HISTOGRAM = Histogram('update_vehicle_status_latency','DB Time to update a vehicle status',['region'])
+ADD_A_RIDE_HISTOGRAM = Histogram('add_a_ride_latency','DB Time to add a ride',['region'])
+UPDATE_VEHICLE_LOCATION_HISTOGRAM = Histogram('update_vehicle_location_latency','DB Time to update a vehicle location',['region'])
+READ_VEHICLE_LOCATION_HISTOGRAM = Histogram('read_vehicle_location_latency','DB Time to read a vehicle location',['region'])
+END_A_RIDE_HISTOGRAM = Histogram('end_a_ride_latency','DB Time to end a ride',['region'])
+READ_A_RIDE_SUMMARY_HISTOGRAM = Histogram('read_a_ride_summary_latency','DB Time to read a ride summary',['region'])
+READ_A_RIDE_SUMMARY_AOST_HISTOGRAM = Histogram('read_a_ride_summary_aost_latency','DB Time to read a ride summary using AOST.',['region'])
 
 
-def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_timer: DemoTimer, stats: DemoStats):
+def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_timer: DemoTimer, stats: DemoStats, region: str):
     # Pick a random user
     user_id = user_ids[randint(0, len(user_ids) - 1)]
 
@@ -57,7 +59,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
         db_engine,
         lambda conn: get_user(conn, user_id)
     )
-    READ_USER_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    READ_USER_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_USER, op_timer.stop())
 
     # Read the vehicle
@@ -67,7 +69,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
         db_engine,
         lambda conn: get_vehicle(conn, vehicle_id)
     )
-    READ_VEHICLE_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    READ_VEHICLE_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_VEHICLE, op_timer.stop())
 
     # Update the vehicle as 'in_use'
@@ -77,7 +79,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
         db_engine,
         lambda conn: update_vehicle_status(conn, vehicle_id, 'in_use')
     )
-    UPDATE_VECHICLE_STATUS_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    UPDATE_VECHICLE_STATUS_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_UPDATE_VEHICLE_STATUS, op_timer.stop())
 
     # Add a ride
@@ -91,7 +93,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
             conn, ride_id, user_id, start_time, vehicle_id, 'San Francisco'
         )
     )
-    ADD_A_RIDE_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    ADD_A_RIDE_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_INSERT_RIDE, op_timer.stop())
 
     # Update vechicle location history
@@ -107,7 +109,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
             db_engine,
             lambda conn: add_vehicle_location_history(conn, ride_id, seen_time, lat, long)
         )
-        UPDATE_VEHICLE_LOCATION_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+        UPDATE_VEHICLE_LOCATION_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
         stats.add_to_stats(DemoStats.OP_INSERT_LOCATION, op_timer.stop())
 
         # Read the latest location
@@ -117,7 +119,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
             db_engine,
             lambda conn: read_vehicle_last_location(conn, loc_id)
         )
-        READ_VEHICLE_LOCATION_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+        READ_VEHICLE_LOCATION_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
         stats.add_to_stats(DemoStats.OP_READ_LAST_LOCATION, op_timer.stop())
 
     # End a ride
@@ -128,7 +130,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
         db_engine,
         lambda conn: end_ride(conn, ride_id, end_time)
     )
-    END_A_RIDE_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    END_A_RIDE_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_UPDATE_RIDE, op_timer.stop())
 
     # Update the vehicle as 'available'
@@ -138,7 +140,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
         db_engine,
         lambda conn: update_vehicle_status(conn, vehicle_id, 'available')
     )
-    UPDATE_VECHICLE_STATUS_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    UPDATE_VECHICLE_STATUS_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_UPDATE_VEHICLE_STATUS, op_timer.stop())
 
     # Read ride summary
@@ -148,7 +150,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
         db_engine,
         lambda conn: read_ride_info(conn, ride_id)
     )
-    READ_A_RIDE_SUMMARY_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    READ_A_RIDE_SUMMARY_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_RIDE, op_timer.stop())
 
     # Read ride summary as a follower read
@@ -158,7 +160,7 @@ def demo_flow_once(db_engine: SAEngine, user_ids: list, vehicle_ids: list, op_ti
         db_engine,
         lambda conn: read_ride_info_aost(conn, ride_id)
     )
-    READ_A_RIDE_SUMMARY_AOST_HISTOGRAM.observe((perf_counter() - start_txn_time)*1000)
+    READ_A_RIDE_SUMMARY_AOST_HISTOGRAM.labels(region).observe((perf_counter() - start_txn_time)*1000)
     stats.add_to_stats(DemoStats.OP_READ_RIDE_AOST, op_timer.stop())
 
     # Get the node info all of this was run on
@@ -199,6 +201,9 @@ def main():
     )
 
     print(f"Connected to node id {node_info[0]} at {node_info[1]}")
+    p=re.compile('region=([^,]*).*')
+    m=p.match(node_info[1])
+    region = m.group(1)
 
     stats = DemoStats(STATS_INTERVAL_SECS, node_info[0], node_info[1])
     op_timer = DemoTimer()
@@ -225,7 +230,7 @@ def main():
 
     while True:
 
-        demo_flow_once(db_engine, user_ids, vehicle_ids, op_timer, stats)
+        demo_flow_once(db_engine, user_ids, vehicle_ids, op_timer, stats, region)
 
         stats.display_if_ready()
         # print()

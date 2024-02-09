@@ -1,3 +1,5 @@
+Re-pull multi-region
+	git clone -b prometheus https://github.com/nollenr/AZURE-Terraform-CRDB-Multi-Region.git
 
 # As root
 sudo su - 
@@ -15,7 +17,13 @@ Remember to open the Network Security Group for the General App Server (where Gr
     Source Port Ranges: *
     Destination: Any
     Service: Custom
-    Destination Port Ranges: 9090
+    Destination Port Ranges: 9090,26257
     Name: Grafana
 
+Add 8000 to the existing Network Security Group for access to the prometheus servers in the desktop browser
 create bob in the database so that Grafana can connect.
+
+
+Grafana Data Sources
+    for the CRDB connection, use: 20.230.253.235:26257 (no http, etc)
+    for the prometheus connections, use http://20.230.162.186:9090 where the IP is the address of the app servers

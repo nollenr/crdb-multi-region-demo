@@ -27,3 +27,10 @@ create bob in the database so that Grafana can connect.
 Grafana Data Sources
     for the CRDB connection, use: 20.230.253.235:26257 (no http, etc)
     for the prometheus connections, use http://20.230.162.186:9090 where the IP is the address of the app servers
+
+
+Demo Notes:
+show zone configuration from database movr_demo;
+show survival goal from database movr_demo;
+alter database movr_demo survive region failure;
+

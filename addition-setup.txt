@@ -1,36 +1,88 @@
-Re-pull multi-region
+In the General App Server: Re-pull multi-region
 	git clone -b prometheus https://github.com/nollenr/AZURE-Terraform-CRDB-Multi-Region.git
+    terraform init
+        < edit terraform .tfvars >
+        !!! Do This !!!      ****************************************************
+        < export key vars >  **************************************************** <------------------------------------EEEEEEEEK!!!!
+    terraform plan
+    terraform apply
 
-# As root
-sudo su - 
-dnf install python3.8 -y
-pip3.8 install sqlalchemy
-dnf install python38-devel -y
-pip3.8 install psycopg2
-pip3.8 install sqlalchemy-cockroachdb
-pip3.8 install prometheus-client
-
-
-Remember to open the Network Security Group for the General App Server (where Grafana will be running) on port 9090 & 26257
-    Source: IP Address
-    Source IP Address Range: 52.233.87.48/32
-    Source Port Ranges: *
-    Destination: Any
-    Service: Custom
-    Destination Port Ranges: 9090,26257
-    Name: Grafana
-
-Add 8000 to the existing Network Security Group for access to the prometheus servers in the desktop browser
-create bob in the database so that Grafana can connect.
+Ports: 
+    3000 - grafana port for UI
+    9090 - grafana connects to prometheus on the app servers via this port
 
 
-Grafana Data Sources
-    for the CRDB connection, use: 20.230.253.235:26257 (no http, etc)
-    for the prometheus connections, use http://20.230.162.186:9090 where the IP is the address of the app servers
+In Azure - Network Security Groups (repeat in all 3 groups)
+    Desktop-Access-To-SSH-HTTP-CRDB: Add 8000 (prometheus) to the Destination Port Range.  This allows my desktop to talk to prometheus if I want to see the metrics.  
 
+    Inbound Security Rules: add Grafana.  This allows grafana (running on the "general app server" to talk to prometheus on the app servers.)
+        Source: IP Address
+        Source IP Address Range: 52.233.87.48/32
+        Source Port Ranges: *
+        Destination: Any
+        Service: Custom
+        Destination Port Ranges: 9090,26257
+        Name: Grafana
+
+Open the 3 Demo App servers and in each server:
+    PROMETHEUS_INSTALL
+    MULTIREGION_DEMO_INSTALL
+
+    # As root
+    sudo su - 
+    dnf install python3.8 -y
+    pip3.8 install sqlalchemy
+    dnf install python38-devel -y
+    pip3.8 install psycopg2
+    pip3.8 install sqlalchemy-cockroachdb
+    pip3.8 install prometheus-client
+
+    start the Demo  - python3.8 demo.py
+
+In one App Server:
+    create bob in the database so that Grafana can connect.
+
+
+Open: Grafana, Database UI, 3 App Servers, 1 Database server
+
+
+Grafana - Update Data Sources
+    grafana is available on the general app server: 52.233.87.48:3000
+    for the CRDB connection, use: <HA Proxy Node>:26257 (no http, etc) (an HA Proxy )
+    for the prometheus connections, use http://20.230.162.186:9090 where the IP is the address of the app servers in the same region as the data source
+
+Cockroach Database UI:
+    pick a database node: 20.120.215.48:8080
+    in network: choose sort by Region / collapse nodes
 
 Demo Notes:
+1.  THIS IS NOT ABOUT THROUGHPUT - the nodes I'm running on are VERY, VERY SMALL (2 vcpu) / it is a demonstation of multi region
+2.  Move around the grafa dashboard... show all the panels/rows and what the variables change
+3.  talk about the location of the cluster and the network timing.
+4.  Table Types
+5.  Suvrival modes: 
+Changing Latencies / Change Survival modes / Watch ranges change and Latencies change.
+Drop a node / Region
+
+
 show zone configuration from database movr_demo;
 show survival goal from database movr_demo;
 alter database movr_demo survive region failure;
 
+
+ set cluster setting sql.show_ranges_deprecated_behavior.enabled =false;
+
+ Look at Cluster Regions (Cluster Location in Grafana)
+ Look at Regional Table Replica Locations / Look at Regional Table Reads & Writes / Look at the default Survival Goal in SQL  <---- do the numbers's we're seeing make sense?
+ Change Survival Goal / alter database movr_demo survive zone failure; <------- what do we expect to happen and why?
+ Look at the Regional Table Replica Locations.
+ Look at the Regional-By-Row & Global table latencies <---------------- RBR Writes also changed!   Well, there must have been voting replicas in other regions.
+    Super Regions / Placement Restricted (no longer recommended)
+
+Create a Zone Failure - take down an AZ/Node - be sure it is one to which the application is connected.
+    What happens to latencies, especially RBR ?
+    What happened to the application?
+
+Create a Regional Outage
+    What happens to latencies
+    What happened to the regions that where there was no Outage
